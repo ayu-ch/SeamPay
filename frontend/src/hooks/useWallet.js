@@ -2,6 +2,22 @@ import { useState, useCallback, useEffect } from "react";
 import { BrowserProvider } from "ethers";
 import { ACTIVE_CHAIN_ID, ACTIVE_NETWORK } from "../config.js";
 
+/**
+ * Pick the MetaMask provider specifically when multiple wallets are injected.
+ * Falls back to window.ethereum if MetaMask isn't found in the providers list.
+ */
+function getEthereumProvider() {
+  if (!window.ethereum) return null;
+  // EIP-5749: multiple injected providers list
+  if (window.ethereum.providers?.length) {
+    const mm = window.ethereum.providers.find((p) => p.isMetaMask && !p.isOKXWallet);
+    if (mm) return mm;
+    // fallback: first provider that isn't OKX/Coinbase aggregator
+    return window.ethereum.providers[0];
+  }
+  return window.ethereum;
+}
+
 export function useWallet() {
   const [provider,  setProvider]  = useState(null);
   const [signer,    setSigner]    = useState(null);
@@ -13,15 +29,17 @@ export function useWallet() {
   const isCorrectChain = chainId === ACTIVE_CHAIN_ID;
 
   const connect = useCallback(async () => {
-    if (!window.ethereum) {
-      setError("MetaMask not found. Please install it.");
-      return;
-    }
     setConnecting(true);
     setError(null);
     try {
-      await window.ethereum.request({ method: "eth_requestAccounts" });
-      const p = new BrowserProvider(window.ethereum);
+      // Prefer MetaMask directly if multiple wallets are injected
+      const eth = getEthereumProvider();
+      if (!eth) {
+        setError("No wallet found. Please install MetaMask.");
+        return;
+      }
+      await eth.request({ method: "eth_requestAccounts" });
+      const p = new BrowserProvider(eth);
       const s = await p.getSigner();
       const a = await s.getAddress();
       const net = await p.getNetwork();
@@ -38,15 +56,16 @@ export function useWallet() {
   }, []);
 
   const switchChain = useCallback(async () => {
-    if (!window.ethereum) return;
+    const eth = getEthereumProvider();
+    if (!eth) return;
     try {
-      await window.ethereum.request({
+      await eth.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: ACTIVE_NETWORK.chainId }],
       });
     } catch (e) {
       if (e.code === 4902) {
-        await window.ethereum.request({
+        await eth.request({
           method: "wallet_addEthereumChain",
           params: [ACTIVE_NETWORK],
         });
@@ -56,7 +75,8 @@ export function useWallet() {
 
   // Sync on account / chain changes
   useEffect(() => {
-    if (!window.ethereum) return;
+    const eth = getEthereumProvider();
+    if (!eth) return;
 
     const onAccountsChanged = (accounts) => {
       if (accounts.length === 0) {
@@ -73,11 +93,11 @@ export function useWallet() {
       connect();
     };
 
-    window.ethereum.on("accountsChanged", onAccountsChanged);
-    window.ethereum.on("chainChanged", onChainChanged);
+    eth.on("accountsChanged", onAccountsChanged);
+    eth.on("chainChanged", onChainChanged);
     return () => {
-      window.ethereum.removeListener("accountsChanged", onAccountsChanged);
-      window.ethereum.removeListener("chainChanged", onChainChanged);
+      eth.removeListener("accountsChanged", onAccountsChanged);
+      eth.removeListener("chainChanged", onChainChanged);
     };
   }, [connect]);
 

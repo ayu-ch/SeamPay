@@ -1,7 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
-import { Contract, MaxUint256 } from "ethers";
-import { VAULT_ADDRESS, USDT0_ADDRESS, EXPLORER_URL } from "../config.js";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Contract, MaxUint256, JsonRpcProvider } from "ethers";
+import { VAULT_ADDRESS, USDT0_ADDRESS, EXPLORER_URL, ACTIVE_NETWORK } from "../config.js";
 import { VAULT_ABI, ERC20_ABI } from "../abi.js";
+
+// Read-only provider using the public RPC — always available, no wallet needed
+const readProvider = new JsonRpcProvider(ACTIVE_NETWORK.rpcUrls[0]);
 
 export function useVault(signer, address) {
   const [vaultBalance,   setVaultBalance]   = useState(null);
@@ -17,22 +20,34 @@ export function useVault(signer, address) {
   const [lastTx,         setLastTx]         = useState(null);
   const [txError,        setTxError]        = useState(null);
 
-  const vault = signer ? new Contract(VAULT_ADDRESS, VAULT_ABI, signer) : null;
-  const token = signer ? new Contract(USDT0_ADDRESS, ERC20_ABI, signer) : null;
+  // Read contract uses public RPC so stats load even before wallet connects
+  const vaultRead = useMemo(
+    () => new Contract(VAULT_ADDRESS, VAULT_ABI, readProvider),
+    []
+  );
+  // Write contracts need the signer
+  const vault = useMemo(
+    () => signer ? new Contract(VAULT_ADDRESS, VAULT_ABI, signer) : null,
+    [signer]
+  );
+  const token = useMemo(
+    () => signer ? new Contract(USDT0_ADDRESS, ERC20_ABI, signer) : null,
+    [signer]
+  );
 
   const refresh = useCallback(async () => {
-    if (!vault || !address) return;
     setLoading(true);
     try {
+      const workerAddr = address || "0x0000000000000000000000000000000000000000";
       const [bal, tot, uns, run, wAcc, wStream, wList, owner] = await Promise.all([
-        vault.vaultBalance(),
-        vault.totalAccrued(),
-        vault.unstreamedBalance(),
-        vault.runwayDays(),
-        vault.accrued(address),
-        vault.streams(address),
-        vault.getWorkers(),
-        vault.owner(),
+        vaultRead.vaultBalance(),
+        vaultRead.totalAccrued(),
+        vaultRead.unstreamedBalance(),
+        vaultRead.runwayDays(),
+        vaultRead.accrued(workerAddr),
+        vaultRead.streams(workerAddr),
+        vaultRead.getWorkers(),
+        vaultRead.owner(),
       ]);
       setVaultBalance(bal);
       setTotalAccrued(tot);
@@ -43,11 +58,11 @@ export function useVault(signer, address) {
       setWorkers(wList);
       setOwnerAddress(owner);
     } catch (e) {
-      console.error("refresh error", e);
+      console.error("refresh error:", e?.message || e);
     } finally {
       setLoading(false);
     }
-  }, [vault, address]);
+  }, [vaultRead, address]);
 
   // Poll every 10 seconds
   useEffect(() => {
