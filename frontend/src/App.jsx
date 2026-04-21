@@ -1,127 +1,168 @@
-import React, { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWallet } from "./hooks/useWallet.js";
-import { useVault }  from "./hooks/useVault.js";
-import Header       from "./components/Header.jsx";
-import EmployerTab  from "./components/EmployerTab.jsx";
-import WorkerTab    from "./components/WorkerTab.jsx";
-import { VAULT_ADDRESS, USDT0_ADDRESS } from "./config.js";
-
-const TABS = ["Employer", "Worker"];
+import { useVault } from "./hooks/useVault.js";
+import EmployerTab from "./components/EmployerTab.jsx";
+import WorkerTab from "./components/WorkerTab.jsx";
+import Landing from "./components/Landing.jsx";
+import { VAULT_ADDRESS, USDT0_ADDRESS, ACTIVE_NETWORK, ACTIVE_CHAIN_ID } from "./config.js";
 
 export default function App() {
+  const [view, setView] = useState("landing");
+  const [tab, setTab] = useState("worker");
   const wallet = useWallet();
-  const vault  = useVault(wallet.signer, wallet.address);
-  const [tab, setTab] = useState("Worker");
+  const vault = useVault(wallet.signer, wallet.address);
 
-  const isOwner = wallet.address && vault.ownerAddress &&
-    wallet.address.toLowerCase() === vault.ownerAddress.toLowerCase();
+  // Auto-select the Employer tab if the connected wallet is the vault owner.
+  // Only runs once per (address, owner) pair so the user can still switch.
+  const autoPickedRef = useRef(null);
+  useEffect(() => {
+    const addr = wallet.address?.toLowerCase();
+    const owner = vault.ownerAddress?.toLowerCase();
+    if (!addr || !owner) return;
+    const key = `${addr}:${owner}`;
+    if (autoPickedRef.current === key) return;
+    autoPickedRef.current = key;
+    setTab(addr === owner ? "employer" : "worker");
+  }, [wallet.address, vault.ownerAddress]);
 
-  const missingConfig = !VAULT_ADDRESS || !USDT0_ADDRESS;
+  if (view === "landing") {
+    return <Landing onLaunch={() => setView("app")} />;
+  }
+
+  const wrongNetwork = wallet.address && !wallet.isCorrectChain;
+  const configured = VAULT_ADDRESS && USDT0_ADDRESS;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <Header
-        address={wallet.address}
-        chainId={wallet.chainId}
-        isCorrectChain={wallet.isCorrectChain}
-        connecting={wallet.connecting}
-        onConnect={wallet.connect}
-        onSwitch={wallet.switchChain}
-      />
-
-      <main className="max-w-2xl mx-auto px-4 py-8">
-
-        {/* Hero */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Payroll that streams in real time
-          </h1>
-          <p className="text-gray-400 text-sm max-w-md mx-auto">
-            Employers fund a vault with USDT0. Workers accrue earnings every second
-            and withdraw anytime — no bank wires, no wait.
-          </p>
-        </div>
-
-        {/* Setup warning */}
-        {missingConfig && (
-          <div className="card border-yellow-800 bg-yellow-900/10 text-yellow-300 text-sm mb-6">
-            <p className="font-semibold mb-1">⚠ Contract not configured</p>
-            <p>
-              Set <code className="bg-gray-800 px-1 rounded">VITE_VAULT_ADDRESS</code> and{" "}
-              <code className="bg-gray-800 px-1 rounded">VITE_USDT0_ADDRESS</code> in{" "}
-              <code className="bg-gray-800 px-1 rounded">frontend/.env</code> then restart the dev server.
-            </p>
-          </div>
-        )}
-
-        {/* Connect prompt */}
-        {!wallet.address && (
-          <div className="card text-center py-10 mb-6">
-            <p className="text-gray-400 mb-4">Connect your wallet to get started</p>
-            <button className="btn-primary" onClick={wallet.connect} disabled={wallet.connecting}>
-              {wallet.connecting ? "Connecting…" : "Connect Wallet"}
-            </button>
-            {wallet.error && (
-              <p className="text-red-400 text-sm mt-3">{wallet.error}</p>
-            )}
-          </div>
-        )}
-
-        {/* Wrong network */}
-        {wallet.address && !wallet.isCorrectChain && (
-          <div className="card text-center py-8 mb-6 border-red-800">
-            <p className="text-red-400 mb-4">Please switch to Conflux eSpace to continue</p>
-            <button className="btn-primary" onClick={wallet.switchChain}>
-              Switch Network
-            </button>
-          </div>
-        )}
-
-        {/* Main UI */}
-        {wallet.address && wallet.isCorrectChain && (
-          <>
-            {/* Tab bar */}
-            <div className="flex bg-gray-900 rounded-xl p-1 mb-6 gap-1">
-              {TABS.map(t => (
-                <button key={t}
-                  onClick={() => setTab(t)}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                    tab === t
-                      ? "bg-brand-500 text-white"
-                      : "text-gray-400 hover:text-white"
-                  }`}>
-                  {t}
-                  {t === "Employer" && isOwner && (
-                    <span className="ml-1 text-xs bg-brand-700 text-brand-200 px-1.5 py-0.5 rounded-full">
-                      you
-                    </span>
-                  )}
-                </button>
-              ))}
+    <div className="min-h-full bg-ink-50 text-ink-900">
+      <header className="sticky top-4 z-30 px-4">
+        <div className="mx-auto max-w-6xl bg-white rounded-full shadow-[0_6px_24px_rgba(10,15,12,0.08)] border border-ink-100 flex items-center justify-between pl-6 pr-2 py-2">
+          <button
+            onClick={() => setView("landing")}
+            className="flex items-center gap-2"
+          >
+            <div className="w-8 h-8 rounded-lg bg-ink-900 grid place-items-center">
+              <div className="w-2.5 h-2.5 rounded-full bg-lime-400 pulse-dot" />
             </div>
+            <span className="font-extrabold tracking-tight text-lg">
+              SeamPay
+            </span>
+          </button>
+          <div className="hidden md:flex items-center gap-2 bg-ink-50 rounded-full p-1">
+            <TabButton active={tab === "worker"} onClick={() => setTab("worker")}>
+              Worker
+            </TabButton>
+            <TabButton
+              active={tab === "employer"}
+              onClick={() => setTab("employer")}
+            >
+              Employer
+            </TabButton>
+          </div>
+          {wallet.address ? (
+            <span className="bg-ink-900 text-white rounded-full px-5 py-2.5 text-sm font-mono">
+              {wallet.address.slice(0, 6)}…{wallet.address.slice(-4)}
+            </span>
+          ) : (
+            <button
+              onClick={wallet.connect}
+              disabled={wallet.connecting}
+              className="bg-ink-900 text-white rounded-full px-5 py-2.5 font-semibold text-sm hover:bg-ink-950 disabled:opacity-50"
+            >
+              {wallet.connecting ? "Connecting…" : "Connect wallet"}
+            </button>
+          )}
+        </div>
+      </header>
 
-            {/* Tab content */}
-            {tab === "Employer" && <EmployerTab vault={vault} />}
-            {tab === "Worker"   && <WorkerTab   vault={vault} />}
-          </>
+      {wallet.error && (
+        <div className="max-w-6xl mx-auto mt-4 px-6 text-sm text-red-600">
+          {wallet.error}
+        </div>
+      )}
+
+      {!configured && (
+        <Banner tone="amber">
+          Set <code className="font-mono">VITE_VAULT_ADDRESS</code> and{" "}
+          <code className="font-mono">VITE_USDT0_ADDRESS</code> in{" "}
+          <code className="font-mono">frontend/.env</code> after deploying.
+        </Banner>
+      )}
+
+      {wrongNetwork && (
+        <Banner tone="amber">
+          <div className="flex items-center justify-between gap-4">
+            <span>
+              Wrong network. Expected {ACTIVE_NETWORK.chainName} (chainId{" "}
+              {ACTIVE_CHAIN_ID}).
+            </span>
+            <button
+              onClick={wallet.switchChain}
+              className="bg-ink-900 text-white rounded-full px-4 py-1.5 font-semibold text-sm"
+            >
+              Switch
+            </button>
+          </div>
+        </Banner>
+      )}
+
+      <main className="mx-auto max-w-5xl px-6 py-10">
+        {!wallet.address ? (
+          <div className="bg-white rounded-3xl border border-ink-100 p-10 text-center">
+            <h2 className="display text-3xl">Connect to continue</h2>
+            <p className="mt-3 text-ink-900/60">
+              SeamPay needs a wallet on Conflux eSpace to read your stream
+              and sign withdrawals.
+            </p>
+            <button
+              onClick={wallet.connect}
+              disabled={wallet.connecting}
+              className="mt-6 bg-ink-900 text-white rounded-full px-6 py-3 font-semibold disabled:opacity-50"
+            >
+              {wallet.connecting ? "Connecting…" : "Connect wallet"}
+            </button>
+          </div>
+        ) : wrongNetwork || !configured ? (
+          <div className="text-ink-900/60">Fix the banner above first.</div>
+        ) : tab === "worker" ? (
+          <WorkerTab vault={vault} wallet={wallet} />
+        ) : (
+          <EmployerTab vault={vault} wallet={wallet} />
         )}
-
-        {/* Footer */}
-        <footer className="mt-12 text-center text-xs text-gray-600 space-y-1">
-          <p>
-            Built on{" "}
-            <a href="https://doc.confluxnetwork.org/" target="_blank" rel="noreferrer"
-               className="hover:text-gray-400 underline">Conflux eSpace</a>
-            {" "}·{" "}
-            <a href="https://evm.confluxscan.io" target="_blank" rel="noreferrer"
-               className="hover:text-gray-400 underline">ConfluxScan</a>
-            {" "}·{" "}
-            <a href="https://github.com" target="_blank" rel="noreferrer"
-               className="hover:text-gray-400 underline">GitHub</a>
-          </p>
-          <p>RemitStream — Global Hackfest 2026 · MIT License</p>
-        </footer>
       </main>
+
+      <footer className="mx-auto max-w-6xl px-6 py-10 text-xs text-ink-900/50">
+        USDT0 · Built on Conflux eSpace
+      </footer>
+    </div>
+  );
+}
+
+function TabButton({ active, children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={
+        "px-4 py-1.5 rounded-full font-semibold text-sm transition " +
+        (active
+          ? "bg-ink-900 text-white"
+          : "text-ink-900/70 hover:text-ink-900")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+function Banner({ tone = "amber", children }) {
+  const color =
+    tone === "amber"
+      ? "bg-lime-50 text-forest-900 border-lime-200"
+      : "bg-red-50 text-red-900 border-red-200";
+  return (
+    <div className="max-w-6xl mx-auto mt-4 px-6">
+      <div className={`rounded-2xl border px-5 py-3 text-sm ${color}`}>
+        {children}
+      </div>
     </div>
   );
 }
