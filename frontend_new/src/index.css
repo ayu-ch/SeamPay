@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+html, body, #root {
+  height: 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  background: #f5f7f4;
+  color: #0a0f0c;
+}
+
+/* Giant display text — tighten letters */
+.display {
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+  font-weight: 800;
+}
+
+/* Soft gradient backdrop used behind the hero glass visual */
+.hero-gradient {
+  background:
+    radial-gradient(1200px 600px at 50% 90%, rgba(163,230,53,0.22), transparent 60%),
+    linear-gradient(180deg, #eef0ec 0%, #d9ded4 100%);
+}
+
+.forest-gradient {
+  background:
+    radial-gradient(900px 450px at 50% 0%, rgba(163,230,53,0.18), transparent 55%),
+    linear-gradient(180deg, #071a10 0%, #050805 100%);
+}
+
+/* Rotating word stack */
+.rotator {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.rotator > span {
+  display: block;
+  animation: rotate-words 6s infinite;
+}
+@keyframes rotate-words {
+  0%, 28%   { transform: translateY(0%); }
+  33%, 61%  { transform: translateY(-100%); }
+  66%, 94%  { transform: translateY(-200%); }
+  100%      { transform: translateY(-300%); }
+}
+
+/* Subtle pulse on the green dot */
+.pulse-dot {
+  box-shadow: 0 0 0 0 rgba(163,230,53,0.8);
+  animation: pulse 1.8s infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(163,230,53,0.7); }
+  70%  { box-shadow: 0 0 0 14px rgba(163,230,53,0); }
+  100% { box-shadow: 0 0 0 0 rgba(163,230,53,0); }
+}
+
+/* Glass orb used in the hero — pure CSS, no 3D asset */
+.glass-orb {
+  width: 520px;
+  height: 520px;
+  border-radius: 9999px;
+  position: relative;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,0.7), rgba(255,255,255,0) 45%),
+    radial-gradient(circle at 70% 70%, rgba(163,230,53,0.6), rgba(11,36,24,0) 60%),
+    radial-gradient(circle at 50% 50%, #2a6b3b, #0b2418 70%);
+  box-shadow:
+    inset 0 -30px 80px rgba(0,0,0,0.4),
+    inset 0 30px 80px rgba(255,255,255,0.15),
+    0 30px 80px rgba(11,36,24,0.35);
+  filter: blur(0.3px);
+}
+.glass-orb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.55), transparent 30%);
+  mix-blend-mode: screen;
+}
+
+/* Ticker — big mono number */
+.ticker {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-feature-settings: 'tnum';
+}
+
+/* Hide scrollbar in horizontal scroll if used later */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
